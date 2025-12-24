@@ -214,3 +214,41 @@ def fit_arma_44(signal_data, p, q):
     print(model_fit.summary())
     
     return model_fit
+
+
+
+def analyze_axis_orthogonality(x_axis_data, y_axis_data, sampling_rate=1000):
+    # 1. Normalize the signals (Zero mean, Unit variance) 
+    # This helps in seeing if correlation is 'around 0' regardless of signal scale
+    x_norm = (x_axis_data - np.mean(x_axis_data)) / np.std(x_axis_data)
+    y_norm = (y_axis_data - np.mean(y_axis_data)) / np.std(y_axis_data)
+    
+    # 2. Compute Cross-Correlation R_xy(tau)
+    # 'full' mode gives lags from -(N-1) to +(N-1)
+    r_xy = signal.correlate(x_norm, y_norm, mode='full') / len(x_norm)
+    lags = signal.correlation_lags(len(x_norm), len(y_norm))
+    
+    # 3. Plotting the result
+    plt.figure(figsize=(10, 5))
+    plt.plot(lags, r_xy)
+    plt.axhline(0, color='red', linestyle='--') # The Orthogonality line
+    plt.title("Cross-Correlation R_xy (X-axis vs Y-axis)")
+    plt.xlabel("Lag (samples)")
+    plt.ylabel("Correlation Coefficient")
+    plt.grid(True)
+    plt.show()
+
+def resample_milling_data(data, original_fs=2000, target_fs=1000):
+    """
+    Resamples the data from original_fs to target_fs.
+    """
+    # 1. Calculate the number of samples in the new signal
+    # New Length = (Original Length * Target Frequency) / Original Frequency
+    number_of_samples = int(len(data) * target_fs / original_fs)
+    
+    # 2. Resample the signal
+    # scipy.signal.resample uses an FFT-based method which inherently 
+    # handles anti-aliasing in the frequency domain.
+    resampled_data = signal.resample(data, number_of_samples)
+    
+    return resampled_data
