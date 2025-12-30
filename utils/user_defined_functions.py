@@ -255,21 +255,46 @@ def resample_milling_data(data, original_fs=2000, target_fs=1000):
     
     return resampled_data
 
-def extract_features(x, y):
+def extract_features(x, y, z, Fs=2000, fmin=180, fmax=220):
     features = {}
     
-    # Statistical features (The "Fingerprint")
-    features['x_rms'] = np.sqrt(np.mean(x**2))
-    features['x_kurtosis'] = kurtosis(x)
-    features['y_rms'] = np.sqrt(np.mean(y**2))
-    features['y_kurtosis'] = kurtosis(y)
+    # Statistical features
+    
     
     # Interaction features
-    corr = signal.correlate(x, y, mode='full')
-    lags = signal.correlation_lags(len(x), len(y), mode='full')
-    max_idx = np.argmax(corr)
+    corr_xy = signal.correlate(x, y, mode='full')
+    corr_yz = signal.correlate(y, z, mode='full')
+    corr_xz = signal.correlate(x, z, mode='full')
+    #lags = signal.correlation_lags(len(x), len(y), mode='full')
+    max_idxy = np.argmax(corr_xy)
+    max_idyz = np.argmax(corr_yz)
+    max_idxz = np.argmax(corr_xz)
     
-    features['max_cross_corr'] = corr[max_idx]
-    features['lag_at_max_corr'] = abs(lags[max_idx])
-    
+    features['max_cross_corr_xy'] = corr_xy[max_idxy]
+    #features['max_cross_corr_yz'] = corr_yz[max_idyz]
+    #features['max_cross_corr_xz'] = corr_xz[max_idxz]
+    features['cross_corr_xy_kurtosis'] = kurtosis(corr_xy)
+    #features['cross_corr_yz_kurtosis'] = kurtosis(corr_yz)
+    #features['cross_corr_xz_kurtosis'] = kurtosis(corr_xz)
+    #features['lag_at_max_corr'] = abs(lags[max_idx])
+
+    # Frequency domain features
+    f_x, psd_x = signal.welch(x, fs=Fs, nperseg=256)
+    f_y, psd_y = signal.welch(y, fs=Fs, nperseg=256)
+    f_z, psd_z = signal.welch(z, fs=Fs, nperseg=256)
+    features['x_psd_rms'] = np.sqrt(np.mean(psd_x**2))
+    features['y_psd_rms'] = np.sqrt(np.mean(psd_y**2))
+    features['z_psd_rms'] = np.sqrt(np.mean(psd_z**2))
+
+    features['x_psd_max'] = max_psd_in_band(x, Fs=Fs, fmin=fmin, fmax=fmax)
+    features['y_psd_max'] = max_psd_in_band(y, Fs=Fs, fmin=fmin, fmax=fmax)
+    features['z_psd_max'] = max_psd_in_band(z, Fs=Fs, fmin=fmin, fmax=fmax)
+
     return features
+
+def max_psd_in_band(signal, Fs, fmin, fmax):
+    Pxx, freqs = plt.psd(signal, NFFT=len(signal), Fs=Fs)
+    plt.close()  # prevent plotting
+
+    band_mask = (freqs >= fmin) & (freqs <= fmax)
+    return np.max(Pxx[band_mask])#, freqs[band_mask][np.argmax(Pxx[band_mask])]
