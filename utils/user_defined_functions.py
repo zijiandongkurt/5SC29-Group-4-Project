@@ -3,7 +3,6 @@ import sys
 from statsmodels.tsa.stattools import adfuller, acf, pacf
 import numpy as np
 from scipy import ndimage
-import scipy.signal as signal
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.arima.model import ARIMA
@@ -12,12 +11,14 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import pandas as pd
 import math
-from scipy.stats import pearsonr
+import scipy.signal as signal
+from scipy.stats import pearsonr, kurtosis
+
 
 ## Calculate ARIMA parameters based on ACF and PACF plots
 def calculate_arima_params(x, nlag = 50):
-    lag_acf, confint_acf = acf(x[0:5000, 0], nlags=nlag, alpha=0.05)
-    lag_pacf, confint_pacf = pacf(x[0:5000, 0], nlags=nlag, alpha=0.05)
+    lag_acf, confint_acf = acf(x, nlags=nlag, alpha=0.05)
+    lag_pacf, confint_pacf = pacf(x, nlags=nlag, alpha=0.05)
 
     # Calculate the error bars (difference between value and confidence limit)
     # The "blue region" boundary is roughly 1.96 / sqrt(N) for large N
@@ -39,6 +40,7 @@ def calculate_arima_params(x, nlag = 50):
     suggested_p = find_cutoff(lag_pacf, confint_pacf)
 
     print(f"Visual inspection suggests: p (AR) = {suggested_p}, q (MA) = {suggested_q}")
+    return suggested_p, suggested_q
 
 
 ## Calculate auto/cross-correlation matrix with delay
@@ -252,3 +254,22 @@ def resample_milling_data(data, original_fs=2000, target_fs=1000):
     resampled_data = signal.resample(data, number_of_samples)
     
     return resampled_data
+
+def extract_features(x, y):
+    features = {}
+    
+    # Statistical features (The "Fingerprint")
+    features['x_rms'] = np.sqrt(np.mean(x**2))
+    features['x_kurtosis'] = kurtosis(x)
+    features['y_rms'] = np.sqrt(np.mean(y**2))
+    features['y_kurtosis'] = kurtosis(y)
+    
+    # Interaction features
+    corr = signal.correlate(x, y, mode='full')
+    lags = signal.correlation_lags(len(x), len(y), mode='full')
+    max_idx = np.argmax(corr)
+    
+    features['max_cross_corr'] = corr[max_idx]
+    features['lag_at_max_corr'] = abs(lags[max_idx])
+    
+    return features
